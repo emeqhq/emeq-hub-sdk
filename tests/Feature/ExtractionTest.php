@@ -3,7 +3,9 @@
 declare(strict_types=1);
 
 use Emeq\HubSdk\Contracts\ResolvesAccountId;
+use Emeq\HubSdk\Exceptions\NotFoundException;
 use Emeq\HubSdk\Http\HubConnector;
+use Emeq\HubSdk\Http\Request\Extraction\GetRunRequest;
 use Emeq\HubSdk\Http\Request\Extraction\PutHintsRequest;
 use Emeq\HubSdk\Http\Request\Extraction\PutProfileVersionRequest;
 use Emeq\HubSdk\Http\Request\Extraction\StartFileRunRequest;
@@ -151,4 +153,73 @@ it('starts a file run as multipart with profile, version and the named file', fu
                 ['file', '%PDF-1.7 weekstaat', 'weekstaat.pdf'],
             ];
     });
+});
+
+it('gets a completed run with its result under the bound account', function (): void {
+    app()->bind(ResolvesAccountId::class, fn (): ResolvesAccountId => new FixedAccountId('school1'));
+
+    $body = [
+        'run_id' => '01JABCD',
+        'status' => 'completed',
+        'failure_reason' => null,
+        'profile' => 'timesheet',
+        'version' => 1,
+        'readers' => ['ministral-14b-latest'],
+        'billable_pages' => 1,
+        'result' => ['employee' => 'Fatima', 'days' => [8, 8]],
+    ];
+
+    $mock = new MockClient([
+        GetRunRequest::class => MockResponse::make($body),
+    ]);
+
+    app(HubConnector::class)->withMockClient($mock);
+
+    $run = app(Hub::class)->extraction()->getRun('01JABCD');
+
+    expect($run)->toBe($body)
+        ->and($mock->getLastPendingRequest()?->headers()->get('X-Account-Id'))->toBe('school1');
+
+    $mock->assertSent(function (GetRunRequest $request): bool {
+        return $request->getMethod() === Method::GET
+            && $request->resolveEndpoint() === '/extraction/runs/01JABCD';
+    });
+});
+
+it('gets a queued run without result fields for an explicit account', function (): void {
+    $body = [
+        'run_id' => '01JABCE',
+        'status' => 'queued',
+        'failure_reason' => null,
+        'profile' => 'timesheet',
+        'version' => 1,
+        'readers' => null,
+        'billable_pages' => null,
+    ];
+
+    $mock = new MockClient([
+        GetRunRequest::class => MockResponse::make($body),
+    ]);
+
+    app(HubConnector::class)->withMockClient($mock);
+
+    $run = app(Hub::class)->extraction()->getRun('01JABCE', accountId: 'school2');
+
+    expect($run)->toBe($body)
+        ->and($run)->not->toHaveKey('result')
+        ->and($mock->getLastPendingRequest()?->headers()->get('X-Account-Id'))->toBe('school2');
+});
+
+it('throws not found for a run of another account', function (): void {
+    $mock = new MockClient([
+        GetRunRequest::class => MockResponse::make([
+            'error' => 'run_not_found',
+            'message' => 'Run niet gevonden voor dit Account.',
+        ], 404),
+    ]);
+
+    app(HubConnector::class)->withMockClient($mock);
+
+    expect(fn () => app(Hub::class)->extraction()->getRun('01JOTHER', accountId: 'school1'))
+        ->toThrow(NotFoundException::class);
 });

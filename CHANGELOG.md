@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.31.0] — 2026-10-13
+
+### Added
+
+- **`Hub::extraction()->getRun($runId)`** wraps `GET /v1/extraction/runs/{run}`
+  and sends `X-Account-Id` like the other run calls. It returns the decoded body:
+  `run_id`, `status`, `failure_reason`, `profile`, `version`, `readers`,
+  `billable_pages`, and for 24 hours after completion the result fields
+  (`result`, plus `signals` and `pages` for a PDF, JPEG or PNG). `404
+  run_not_found` throws `NotFoundException`. `HubMock::extraction()` now also
+  answers it, and `extractionRunShow()` serves the `extraction-run-show` fixture.
+
+### Changed
+
+- **Webhook payload contract: `extraction.run.completed` no longer carries the
+  result** (since Hub #162). `data` is `{run_id, profile, version, readers,
+  billable_pages}`; fetch `result`, `pages` and `signals` with `getRun()` within
+  24 hours. Hub already sends this shape, so only the fake lagged behind:
+  `FakeHubWebhook::extractionRunCompleted()` now builds the same shape and
+  drops `result`, `signals` and `pages` (test helper, can break consumer tests
+  that read `data['result']`). `extraction.run.failed` was already
+  `{run_id, profile, version, reason}` and is unchanged.
+
 ## [0.30.0] — 2026-10-09
 
 ### Added

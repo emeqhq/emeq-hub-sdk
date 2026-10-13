@@ -107,15 +107,19 @@ test('salesInvoiceChanged can stage an echo of the consumers own write', functio
         ->and($echo->hubLastWroteAt)->toBe('2026-08-12T10:00:00+00:00');
 });
 
-test('extractionRunCompleted builds a document run with both readings and their signals', function (): void {
+test('extractionRunCompleted carries only run metadata, the result is fetched with getRun', function (): void {
     $envelope = FakeHubWebhook::extractionRunCompleted('47', runId: 'run_1')->envelope();
 
     expect($envelope->event)->toBe(HubWebhookEvent::EXTRACTION_RUN_COMPLETED)
         ->and($envelope->provider)->toBe('extraction')
         ->and($envelope->accountId)->toBe('47')
-        ->and($envelope->data)->toHaveKeys(['run_id', 'profile', 'version', 'readers', 'result', 'signals', 'pages'])
-        ->and($envelope->data['run_id'])->toBe('run_1')
-        ->and($envelope->data['signals'])->toHaveKeys(['differs', 'rows_only_in_second_read', 'review']);
+        ->and($envelope->data)->toBe([
+            'run_id' => 'run_1',
+            'profile' => 'timesheet',
+            'version' => 1,
+            'readers' => ['ministral-14b-latest', 'mistral-medium-2604'],
+            'billable_pages' => 1,
+        ]);
 });
 
 test('extractionRunFailed carries the run and its reason', function (): void {

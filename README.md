@@ -520,6 +520,7 @@ suite. `Http\*` is package-internal (BFF / Saloon).
 | `Hub::extraction()->putHints($hints)` | `PUT /v1/extraction/hints` |
 | `Hub::extraction()->runText($profile, $version, $text, $idempotencyKey)` | `POST /v1/extraction/runs` |
 | `Hub::extraction()->runFile($profile, $version, $contents, $filename, $idempotencyKey)` | `POST /v1/extraction/runs` (multipart) |
+| `Hub::extraction()->getRun($runId)` | `GET /v1/extraction/runs/{run}` |
 
 `$provider` is a free string (Hub discovery `key`) — no SDK allowlist.
 Account context uses `X-Account-Id` / `account_external_id` from
@@ -601,8 +602,26 @@ $run = Hub::extraction()->runFile(
 `runFile()` accepts PDF, JPEG, PNG, XLSX and CSV, up to 10 MB and 5 PDF pages.
 Hub decides the type from the content, not the extension.
 
-There is no GET on a run. The result arrives only as a webhook, so claim both
-events in your job:
+Fetch a run with `getRun()`. It always returns `run_id`, `status` (`queued`,
+`completed` or `failed`), `failure_reason`, `profile`, `version`, `readers` and
+`billable_pages`. For 24 hours after a run completes it also carries `result`;
+after that only status and metadata remain. A PDF, JPEG or PNG is read twice by
+separate models and adds `pages` and `signals`: `differs` (`{pointer,
+alternatives}` per cell where the readings disagree), `rows_only_in_second_read`,
+and `review` (JSON Pointers into `result` that a person should check).
+`readers` and `billable_pages` are `null` while the status is `queued`. A run of
+another Account answers `404 run_not_found`. An existing run answers `404
+connection_not_found` once the Account's extraction Connection is revoked. Both
+throw `NotFoundException`; check `$e->error` to tell them apart. Fetching costs
+nothing. If you missed a webhook, fetch the
+run instead of starting a new one under a new key, which is a second paid run:
+
+```php
+$run = Hub::extraction()->getRun($runId);
+```
+
+Hub sends a webhook when a run ends. It only reports that the run is done; fetch
+the result with `getRun()` within 24 hours. Claim both events in your job:
 
 ```php
 use Emeq\HubSdk\Webhooks\HubWebhookEnvelope;
@@ -621,16 +640,14 @@ class ProcessHubWebhook extends ProcessHubWebhookJob
 
     protected function onEvent(HubWebhookEnvelope $envelope, ?string $eventId, ?string $requestId): void
     {
-        // $envelope->data['run_id'], ['result'] or ['reason']
+        // completed: Hub::extraction()->getRun($envelope->data['run_id'], $envelope->accountId)
+        // failed: $envelope->data['reason']
     }
 }
 ```
 
 `extraction.run.completed` carries `run_id`, `profile`, `version`, `readers`
-and `result`. A PDF, JPEG or PNG is read twice by separate models and adds
-`pages` and `signals`: `differs` (`{pointer, alternatives}` per cell where the
-readings disagree), `rows_only_in_second_read`, and `review` (JSON Pointers into
-`result` that a person should check). `extraction.run.failed` carries `run_id`,
+and `billable_pages`, never the result. `extraction.run.failed` carries `run_id`,
 `profile`, `version` and `reason`. Treat an unknown `reason` as a plain
 failure; the list can grow. After a Hub worker restart a run's webhook can
 arrive twice with the same event id, which the package's deduplication already

@@ -72,23 +72,7 @@ final class FakeHubWebhook
                 'profile' => 'timesheet',
                 'version' => 1,
                 'readers' => ['ministral-14b-latest', 'mistral-medium-2604'],
-                'result' => [
-                    'employee' => 'Fatima Karim',
-                    'rows' => [
-                        ['day' => 'ma', 'hours' => 8],
-                        ['day' => 'di', 'hours' => null],
-                    ],
-                ],
-                'signals' => [
-                    'differs' => [
-                        ['pointer' => '/rows/0/hours', 'alternatives' => [7]],
-                    ],
-                    'rows_only_in_second_read' => [
-                        ['day' => 'wo', 'hours' => 4],
-                    ],
-                    'review' => ['/rows/0/hours'],
-                ],
-                'pages' => 1,
+                'billable_pages' => 1,
             ],
             provider: 'extraction',
         );

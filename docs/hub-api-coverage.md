@@ -3,12 +3,13 @@
 Which `/v1/*` endpoints of emeq-hub this SDK wraps, and which it does not yet.
 This doubles as a progress doc: every ⬜ row is backlog.
 
-**As of** 2026-10-09 · **Hub** `55760e2` · **SDK** `0.30.0`
+**As of** 2026-10-13 · **Hub** `a12d7ea` · **SDK** `0.31.0`
 
-Re-checked against Hub `55760e2`. Since the previous stamp (`9c1561e`) the Hub
-added two provider surfaces behind their own feature flags: iTheorie (6 routes,
-wrapped in 0.28.0) and document extraction (3 routes, wrapped in 0.30.0). 0.30.0
-also wrapped `POST /v1/connections`, which extraction needs to switch on per
+Re-checked against Hub `a12d7ea`. Since the stamp before last (`9c1561e`) the
+Hub added two provider surfaces behind their own feature flags: iTheorie (6
+routes, wrapped in 0.28.0) and document extraction (4 routes: 3 wrapped in
+0.30.0, `GET /v1/extraction/runs/{run}` in 0.31.0). 0.30.0 also wrapped
+`POST /v1/connections`, which extraction needs to switch on per
 Account. Hub also has a signed, non-`/v1` surface
 for its own connect drawer (`/connect/{account}/{provider}/manage*`); it is not
 client API and is deliberately absent from this table.
@@ -76,8 +77,8 @@ they are actually in use.
 | Exact pass-through | 5 | 0 |
 | Billing | 1 | 0 |
 | iTheorie | 6 | 6 |
-| Document extraction | 3 | 3 |
-| **Total (in scope)** | **37** | **30** |
+| Document extraction | 4 | 4 |
+| **Total (in scope)** | **38** | **31** |
 
 Counts exclude the OAuth callbacks (browser redirects, listed below for
 completeness) and `/v1/admin/billing/*` (Emeq-internal, behind `emeq.admin`).
@@ -169,14 +170,15 @@ Behind the `itheorie` feature flag. `POST /purchases` requires an
 
 Behind the `extraction` feature flag. Switch it on per Account with
 `connections()->create($accountId, 'extraction')`. A run answers `202` with a
-`run_id`; the result only arrives as the `extraction.run.completed` or
-`extraction.run.failed` webhook, there is no GET on a run.
+`run_id`; Hub sends `extraction.run.completed` or `extraction.run.failed` when
+it ends, and `GET` on the run returns its status and, for 24 hours, the result.
 
 | | Endpoint | Ability | SDK | |
 |---|---|---|---|---|
 | PUT | `/v1/extraction/profiles/{key}/versions/{version}` | `extraction:write` | `extraction()->putProfileVersion()` | ✅ |
 | POST | `/v1/extraction/runs` | `extraction:write` | `extraction()->runText()` / `runFile()` | ✅ |
 | PUT | `/v1/extraction/hints` | `extraction:write` | `extraction()->putHints()` | ✅ |
+| GET | `/v1/extraction/runs/{run}` | `extraction:write` | `extraction()->getRun()` | ✅ |
 
 ## Billing
 

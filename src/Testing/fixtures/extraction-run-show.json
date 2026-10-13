@@ -1,0 +1,13 @@
+{
+    "run_id": "01JABCD5X7Q2M9V3R8T6W4N1KZ",
+    "status": "completed",
+    "failure_reason": null,
+    "profile": "timesheet",
+    "version": 1,
+    "readers": ["ministral-14b-latest"],
+    "billable_pages": 1,
+    "result": {
+        "employee": "Fatima",
+        "days": [8, 8]
+    }
+}

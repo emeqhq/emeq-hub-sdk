@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Emeq\HubSdk\Resources;
 
+use Emeq\HubSdk\Http\Request\Extraction\GetRunRequest;
 use Emeq\HubSdk\Http\Request\Extraction\PutHintsRequest;
 use Emeq\HubSdk\Http\Request\Extraction\PutProfileVersionRequest;
 use Emeq\HubSdk\Http\Request\Extraction\StartFileRunRequest;
@@ -57,6 +58,17 @@ class Extraction extends Resource
             filename: $filename,
             accountId: $this->resolveAccountId($accountId),
             idempotencyKey: $idempotencyKey,
+        ));
+
+        return $this->json($response->json());
+    }
+
+    /** @return array<string, mixed> */
+    public function getRun(string $runId, ?string $accountId = null): array
+    {
+        $response = $this->connector->send(new GetRunRequest(
+            runId: $runId,
+            accountId: $this->resolveAccountId($accountId),
         ));
 
         return $this->json($response->json());
