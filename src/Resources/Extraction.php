@@ -23,7 +23,11 @@ class Extraction extends Resource
         return $this->json($response->json());
     }
 
-    /** @return array<string, mixed> */
+    /**
+     * @deprecated Hints have no measured effect on extraction and will be removed in a later release.
+     *
+     * @return array<string, mixed>
+     */
     public function putHints(?string $hints, ?string $accountId = null): array
     {
         $response = $this->connector->send(new PutHintsRequest(

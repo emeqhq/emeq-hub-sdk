@@ -1,5 +1,13 @@
 # Changelog
 
+## [Unreleased]
+
+### Deprecated
+
+- **`Hub::extraction()->putHints()` and `PutHintsRequest`.** Hints have no
+  measured effect on extraction and will be removed in a later release. The
+  call still works unchanged; `HubMock::extractionHints()` stays for now.
+
 ## [0.31.0] — 2026-10-13
 
 ### Added

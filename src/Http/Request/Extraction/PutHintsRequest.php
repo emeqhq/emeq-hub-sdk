@@ -10,6 +10,7 @@ use Saloon\Enums\Method;
 use Saloon\Http\Request;
 use Saloon\Traits\Body\HasJsonBody;
 
+/** @deprecated Hints have no measured effect on extraction and will be removed in a later release. */
 class PutHintsRequest extends Request implements HasBody
 {
     use HasAccountIdHeader;
