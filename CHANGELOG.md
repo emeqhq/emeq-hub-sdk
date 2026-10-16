@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.32.0] — 2026-10-16
+
+### Removed
+
+- **BREAKING: `Hub::extraction()->putHints()`, `PutHintsRequest` and
+  `HubMock::extractionHints()`**, with the `extraction-hints` fixture.
+  `HubMock::extraction()` no longer maps `*/v1/extraction/hints`. Hub drops
+  `PUT /v1/extraction/hints`: hints had no measured effect on extraction.
+  Remove every call; profile `instructions` remain the way to guide a run.
+
 ## [0.31.1] — 2026-10-16
 
 ### Deprecated

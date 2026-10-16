@@ -167,7 +167,6 @@ it('serves each factory from its own fixture, with the captured status', functio
         'itheorie-purchase-in-flight' => [HubMock::itheoriePurchaseInFlight(), 409],
         'itheorie-student' => [HubMock::itheorieStudent(), 200],
         'extraction-profile-version' => [HubMock::extractionProfileVersion(), 201],
-        'extraction-hints' => [HubMock::extractionHints(), 200],
         'extraction-run' => [HubMock::extractionRun(), 202],
         'extraction-run-show' => [HubMock::extractionRunShow(), 200],
         'connection' => [HubMock::connection(), 201],
@@ -224,7 +223,6 @@ it('answers every extraction call from the captured fixtures', function (): void
 
     expect(app(Hub::class)->connections()->create(42, 'extraction'))->toBe(HubMock::fixture('connection'))
         ->and($extraction->putProfileVersion('timesheet', 1, ['type' => 'object']))->toBe(HubMock::fixture('extraction-profile-version'))
-        ->and($extraction->putHints('FK = Fatima Karim.', ACCOUNT))->toBe(HubMock::fixture('extraction-hints'))
         ->and($extraction->runText('timesheet', 1, 'Fatima ma 8', 'run-1', ACCOUNT))->toBe(HubMock::fixture('extraction-run'))
         ->and($extraction->runFile('timesheet', 1, '%PDF-1.7', 'weekstaat.pdf', 'run-2', ACCOUNT))->toBe(HubMock::fixture('extraction-run'))
         ->and($extraction->getRun('01JABCD5X7Q2M9V3R8T6W4N1KZ', ACCOUNT))->toBe(HubMock::fixture('extraction-run-show'));

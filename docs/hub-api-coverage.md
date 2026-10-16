@@ -177,7 +177,6 @@ it ends, and `GET` on the run returns its status and, for 24 hours, the result.
 |---|---|---|---|---|
 | PUT | `/v1/extraction/profiles/{key}/versions/{version}` | `extraction:write` | `extraction()->putProfileVersion()` | ✅ |
 | POST | `/v1/extraction/runs` | `extraction:write` | `extraction()->runText()` / `runFile()` | ✅ |
-| PUT | `/v1/extraction/hints` | `extraction:write` | `extraction()->putHints()` | ✅ |
 | GET | `/v1/extraction/runs/{run}` | `extraction:write` | `extraction()->getRun()` | ✅ |
 
 ## Billing

@@ -517,7 +517,6 @@ suite. `Http\*` is package-internal (BFF / Saloon).
 | `Hub::itheorie()->student($accessCode)` | `GET /v1/itheorie/students/{accessCode}` |
 | `Hub::itheorie()->studentDetailed($accessCode)` | `GET /v1/itheorie/students/{accessCode}/detailed` |
 | `Hub::extraction()->putProfileVersion($key, $version, $schema, $instructions)` | `PUT /v1/extraction/profiles/{key}/versions/{version}` |
-| `Hub::extraction()->putHints($hints)` (deprecated) | `PUT /v1/extraction/hints` |
 | `Hub::extraction()->runText($profile, $version, $text, $idempotencyKey)` | `POST /v1/extraction/runs` |
 | `Hub::extraction()->runFile($profile, $version, $contents, $filename, $idempotencyKey)` | `POST /v1/extraction/runs` (multipart) |
 | `Hub::extraction()->getRun($runId)` | `GET /v1/extraction/runs/{run}` |
@@ -575,15 +574,8 @@ Hub::extraction()->putProfileVersion('timesheet', 1, [
 Allow `null` on every field that can be blank or unreadable on paper. Without
 it the model guesses a value, or the run fails on schema validation.
 
-Hints, runs and the webhooks are Account-scoped and send `X-Account-Id`, from
-`ResolvesAccountId` or an explicit `accountId:` argument. Hints are plain text
-(up to 4,000 characters) that help the model read; `null` or `''` clears them.
-`putHints()` is deprecated: hints have no measured effect on extraction and the
-method will be removed in a later release.
-
-```php
-Hub::extraction()->putHints('Kolom Proj is de projectcode. FK = Fatima Karim.');
-```
+Runs and the webhooks are Account-scoped and send `X-Account-Id`, from
+`ResolvesAccountId` or an explicit `accountId:` argument.
 
 A run answers `202` with `{run_id, status}` straight away. The SDK never
 invents an `Idempotency-Key`; derive it from something stable on your side, so

@@ -119,11 +119,6 @@ final class HubMock
         return MockResponse::make(self::fixture('extraction-profile-version'), 201);
     }
 
-    public static function extractionHints(): MockResponse
-    {
-        return MockResponse::make(self::fixture('extraction-hints'), 200);
-    }
-
     public static function extractionRun(): MockResponse
     {
         return MockResponse::make(self::fixture('extraction-run'), 202);
@@ -157,7 +152,6 @@ final class HubMock
         return [
             '*/v1/connections' => self::connection(),
             '*/v1/extraction/profiles/*' => self::extractionProfileVersion(),
-            '*/v1/extraction/hints' => self::extractionHints(),
             '*/v1/extraction/runs' => self::extractionRun(),
             '*/v1/extraction/runs/*' => self::extractionRunShow(),
         ];

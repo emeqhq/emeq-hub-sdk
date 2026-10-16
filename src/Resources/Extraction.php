@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Emeq\HubSdk\Resources;
 
 use Emeq\HubSdk\Http\Request\Extraction\GetRunRequest;
-use Emeq\HubSdk\Http\Request\Extraction\PutHintsRequest;
 use Emeq\HubSdk\Http\Request\Extraction\PutProfileVersionRequest;
 use Emeq\HubSdk\Http\Request\Extraction\StartFileRunRequest;
 use Emeq\HubSdk\Http\Request\Extraction\StartTextRunRequest;
@@ -19,21 +18,6 @@ class Extraction extends Resource
     public function putProfileVersion(string $key, int $version, array $schema, ?string $instructions = null): array
     {
         $response = $this->connector->send(new PutProfileVersionRequest($key, $version, $schema, $instructions));
-
-        return $this->json($response->json());
-    }
-
-    /**
-     * @deprecated Hints have no measured effect on extraction and will be removed in a later release.
-     *
-     * @return array<string, mixed>
-     */
-    public function putHints(?string $hints, ?string $accountId = null): array
-    {
-        $response = $this->connector->send(new PutHintsRequest(
-            hints: $hints,
-            accountId: $this->resolveAccountId($accountId),
-        ));
 
         return $this->json($response->json());
     }

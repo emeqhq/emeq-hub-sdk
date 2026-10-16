@@ -6,7 +6,6 @@ use Emeq\HubSdk\Contracts\ResolvesAccountId;
 use Emeq\HubSdk\Exceptions\NotFoundException;
 use Emeq\HubSdk\Http\HubConnector;
 use Emeq\HubSdk\Http\Request\Extraction\GetRunRequest;
-use Emeq\HubSdk\Http\Request\Extraction\PutHintsRequest;
 use Emeq\HubSdk\Http\Request\Extraction\PutProfileVersionRequest;
 use Emeq\HubSdk\Http\Request\Extraction\StartFileRunRequest;
 use Emeq\HubSdk\Http\Request\Extraction\StartTextRunRequest;
@@ -54,43 +53,6 @@ it('treats an unchanged profile version as success and leaves out absent instruc
 
     $mock->assertSent(function (PutProfileVersionRequest $request): bool {
         return $request->body()?->all() === ['schema' => ['type' => 'object']];
-    });
-});
-
-it('puts the account hints with the bound account header', function (): void {
-    app()->bind(ResolvesAccountId::class, fn (): ResolvesAccountId => new FixedAccountId('school1'));
-
-    $mock = new MockClient([
-        PutHintsRequest::class => MockResponse::make(['hints' => 'FK = Fatima Karim.']),
-    ]);
-
-    app(HubConnector::class)->withMockClient($mock);
-
-    $hints = app(Hub::class)->extraction()->putHints('FK = Fatima Karim.');
-
-    expect($hints)->toBe(['hints' => 'FK = Fatima Karim.'])
-        ->and($mock->getLastPendingRequest()?->headers()->get('X-Account-Id'))->toBe('school1');
-
-    $mock->assertSent(function (PutHintsRequest $request): bool {
-        return $request->getMethod() === Method::PUT
-            && $request->resolveEndpoint() === '/extraction/hints'
-            && $request->body()?->all() === ['hints' => 'FK = Fatima Karim.'];
-    });
-});
-
-it('clears the hints by sending null for an explicit account', function (): void {
-    $mock = new MockClient([
-        PutHintsRequest::class => MockResponse::make(['hints' => null]),
-    ]);
-
-    app(HubConnector::class)->withMockClient($mock);
-
-    app(Hub::class)->extraction()->putHints(null, accountId: 'school2');
-
-    expect($mock->getLastPendingRequest()?->headers()->get('X-Account-Id'))->toBe('school2');
-
-    $mock->assertSent(function (PutHintsRequest $request): bool {
-        return $request->body()?->all() === ['hints' => null];
     });
 });
 
