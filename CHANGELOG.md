@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.33.1] — 2026-10-28
+
+### Added
+
+- **`rate_limited` on every `BatchResultResource` row**, from
+  `BookingOutcome::$rateLimited`. `true` for a row stopped by a `429`, `false`
+  otherwise. Existing keys are unchanged.
+
 ## [0.33.0] — 2026-10-28
 
 ### Added

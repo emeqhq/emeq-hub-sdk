@@ -297,6 +297,29 @@ it('stops a batch at the first rate limit and sends nothing after it', function 
     ]);
 });
 
+it('marks rate-limited rows in the batch report and leaves booked rows unmarked', function (): void {
+    app(HubConnector::class)->withMockClient(new MockClient([
+        HubMock::createDocument(),
+        rateLimited(['Retry-After' => '42']),
+    ]));
+
+    $results = runner([
+        'invoice:inv-1' => sendable(['external_id' => 'inv-1']),
+        'invoice:inv-2' => sendable(['external_id' => 'inv-2']),
+    ])->book([['module' => 'invoice', 'id' => 'inv-1'], ['module' => 'invoice', 'id' => 'inv-2']]);
+
+    [$booked, $limited] = array_map(
+        fn (BatchBookingResult $result): array => (new BatchResultResource($result))->toArray(Request::create('/')),
+        $results,
+    );
+
+    expect($booked['rate_limited'])->toBeFalse()
+        ->and($booked['booked'])->toBeTrue()
+        ->and($limited['rate_limited'])->toBeTrue()
+        ->and($limited['retry_after'])->toBe(42)
+        ->and($limited['message'])->toBe($results[1]->outcome->message);
+});
+
 it('keeps going after an outage, since only a rate limit holds for the rest of the batch', function (): void {
     $mock = new MockClient([
         HubMock::createDocument(),
