@@ -19,6 +19,7 @@ class BookingOutcome
         public readonly ?string $reason = null,
         public readonly ?int $retryAfter = null,
         public readonly array $warnings = [],
+        public readonly bool $rateLimited = false,
     ) {}
 
     public static function from(HubDocument $record): static
@@ -57,6 +58,11 @@ class BookingOutcome
     public static function alreadyInProgress(?string $reason = null, ?int $retryAfter = null): static
     {
         return new static(false, 503, BookingMessages::line('already_in_progress'), null, reason: $reason, retryAfter: $retryAfter);
+    }
+
+    public static function rateLimited(int $retryAfter, ?string $reason = null): static
+    {
+        return new static(false, 503, BookingMessages::line('rate_limited'), null, reason: $reason, retryAfter: $retryAfter, rateLimited: true);
     }
 
     public static function upstreamFailure(string $message): static

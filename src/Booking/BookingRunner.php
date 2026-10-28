@@ -46,13 +46,23 @@ class BookingRunner
      */
     public function book(array $requested, bool $withAttachment = true): array
     {
+        $limited = null;
+
         return $this->withinBudget(
             $requested,
-            fn (string $module, string $id): BatchBookingResult => new BatchBookingResult(
-                $module,
-                $id,
-                $this->bookOne($module, $id, $withAttachment),
-            ),
+            function (string $module, string $id) use ($withAttachment, &$limited): BatchBookingResult {
+                if ($limited !== null) {
+                    return new BatchBookingResult($module, $id, $this->announce($module, $id, $limited, $this->subjectOf($module, $id)));
+                }
+
+                $outcome = $this->bookOne($module, $id, $withAttachment);
+
+                if ($outcome->rateLimited) {
+                    $limited = $outcome;
+                }
+
+                return new BatchBookingResult($module, $id, $outcome);
+            },
         );
     }
 
@@ -101,12 +111,25 @@ class BookingRunner
         } catch (BookingAlreadyInProgress $e) {
             return $this->announce($module, $id, BookingOutcome::alreadyInProgress($e->getMessage(), $e->retryAfter), $document->subject);
         } catch (BookingTemporarilyUnavailable $e) {
-            return $this->announce($module, $id, BookingOutcome::unavailable($e->getMessage(), $e->retryAfter), $document->subject);
+            $outcome = $e->getPrevious() instanceof RateLimitException
+                ? BookingOutcome::rateLimited($e->getPrevious()->retryAfterSeconds(), $e->getMessage())
+                : BookingOutcome::unavailable($e->getMessage(), $e->retryAfter);
+
+            return $this->announce($module, $id, $outcome, $document->subject);
         } catch (HubException $e) {
             return $this->announce($module, $id, BookingOutcome::upstreamFailure($e->getMessage()), $document->subject);
         }
 
         return $this->announce($module, $id, BookingOutcome::from($record), $document->subject);
+    }
+
+    protected function subjectOf(string $module, string $id): mixed
+    {
+        try {
+            return $this->documents->resolve($module, $id)->subject;
+        } catch (ModelNotFoundException|DocumentNotAuthorized|DocumentNotBookable) {
+            return null;
+        }
     }
 
     protected function announce(string $module, string $id, BookingOutcome $outcome, mixed $subject = null): BookingOutcome

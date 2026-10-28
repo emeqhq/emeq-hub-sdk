@@ -6,6 +6,7 @@ use Emeq\HubSdk\Exceptions\AuthenticationException;
 use Emeq\HubSdk\Exceptions\HubException;
 use Emeq\HubSdk\Exceptions\MissingConfigurationException;
 use Emeq\HubSdk\Exceptions\NotFoundException;
+use Emeq\HubSdk\Exceptions\RateLimitException;
 use Emeq\HubSdk\Exceptions\ValidationException;
 use Emeq\HubSdk\Http\HubConnector;
 use Emeq\HubSdk\Http\Request\Accounting\GetAccountingRequest;
@@ -203,6 +204,29 @@ it('is mockable from a consumer app through a global mock client on url patterns
     expect($mock->getLastPendingRequest()?->headers()->get('Idempotency-Key'))
         ->toBe('invoice-42');
 });
+
+it('maps a rate-limited booking to the wait Hub asked for, or a minute without one', function (array $headers, int $seconds): void {
+    MockClient::global([
+        '*/v1/accounting/documents' => MockResponse::make([
+            'code' => 'rate_limited',
+            'message' => 'The bookkeeping rate budget is spent.',
+        ], 429, $headers),
+    ]);
+
+    try {
+        app(Hub::class)->accounting()->createDocument(['type' => 'sales_invoice', 'external_id' => 'inv-1'], 'inv-1', 'tenant-1');
+    } catch (RateLimitException $e) {
+        expect($e->error)->toBe('rate_limited')
+            ->and($e->retryAfterSeconds())->toBe($seconds);
+
+        return;
+    }
+
+    $this->fail('Expected a RateLimitException.');
+})->with([
+    'with Retry-After' => [['Retry-After' => '12'], 12],
+    'without Retry-After' => [[], 60],
+]);
 
 it('maps unknown provider as not found when hub returns 404', function (): void {
     $mock = new MockClient([

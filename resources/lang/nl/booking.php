@@ -20,6 +20,7 @@ return [
     'not_allowed' => 'Je mag dit document niet bewerken, dus ook niet boeken.',
     'temporarily_unavailable' => 'De boekhouding is even niet bereikbaar. Er is niets geboekt; probeer het zo nog eens.',
     'already_in_progress' => 'Er loopt al een boeking van dit document. Wacht tot die klaar is.',
+    'rate_limited' => 'De boekhouding neemt even geen boekingen aan. Er is niets geboekt; probeer het later nog eens.',
 
     'error' => [
         // Laatste redmiddel voor een rij zonder bericht — een rij die dit

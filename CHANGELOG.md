@@ -1,5 +1,32 @@
 # Changelog
 
+## [0.33.0] — 2026-10-28
+
+### Added
+
+- **`BookingOutcome::rateLimited()` and `$outcome->rateLimited`.** A `429` from
+  Hub on `createDocument()` now gives this outcome instead of `unavailable()`.
+  It keeps status `503`, so `mayRetry()` stays true, and `retryAfter` is
+  always set: Hub's `Retry-After`, or 60 seconds without one.
+- **`RateLimitException::retryAfterSeconds()`** returns `$retryAfter`, or 60
+  when Hub sent no readable `Retry-After`. `$retryAfter` itself is unchanged.
+
+### Changed
+
+- **`BookingRunner::book()` stops at the first rate limit.** Before, every
+  document after a `429` was still sent and failed the same way. Now that
+  document and every one after it come back as `rateLimited()` with the same
+  wait, and the later ones are not sent to Hub. Results for documents before
+  it are unchanged. The rate-limited document is stored as
+  `STATUS_UNAVAILABLE`; the later ones are not checked, get no ledger row and
+  still fire `DocumentBookingFailed` with the `rateLimited()` outcome, so a
+  batch keeps firing one event per requested document. A `5xx` does not stop
+  the batch. A rate-limited
+  outcome carries the new `rate_limited` line (`hub::booking.rate_limited`)
+  as its message instead of `temporarily_unavailable`. The line names no
+  duration, because `Retry-After` can be hours; build the wait from
+  `retryAfter`.
+
 ## [0.32.0] — 2026-10-16
 
 ### Removed

@@ -9,6 +9,8 @@ use Emeq\HubSdk\Booking\Contracts\ResolvesBookableDocument;
 use Emeq\HubSdk\Booking\HubDocument;
 use Emeq\HubSdk\Booking\Resources\BatchResultResource;
 use Emeq\HubSdk\Booking\Resources\CheckResultResource;
+use Emeq\HubSdk\Events\DocumentBooked;
+use Emeq\HubSdk\Events\DocumentBookingFailed;
 use Emeq\HubSdk\Exceptions\DocumentNotAuthorized;
 use Emeq\HubSdk\Exceptions\DocumentNotBookable;
 use Emeq\HubSdk\Http\HubConnector;
@@ -18,6 +20,7 @@ use Emeq\HubSdk\Testing\HubMock;
 use Emeq\HubSdk\Tests\Doubles\FakeBookableDocuments;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Event;
 use Saloon\Http\Faking\MockClient;
 use Saloon\Http\Faking\MockResponse;
 
@@ -212,6 +215,123 @@ it('passes the wait Hub asked for through to the batch report', function (): voi
     expect($resource['retry_after'])->toBe(30)
         ->and($resource['may_retry'])->toBeTrue()
         ->and($resource['status'])->toBe(503);
+});
+
+function rateLimited(array $headers = []): MockResponse
+{
+    return MockResponse::make([
+        'code' => 'rate_limited',
+        'message' => 'The bookkeeping rate budget is spent.',
+    ], 429, $headers);
+}
+
+it('reports a rate-limited document as rate limited, with the wait Hub asked for or a minute', function (array $headers, int $seconds): void {
+    app(HubConnector::class)->withMockClient(new MockClient([
+        CreateDocumentRequest::class => rateLimited($headers),
+    ]));
+
+    $outcome = runner(['invoice:inv-1' => sendable()])->bookOne('invoice', 'inv-1');
+
+    expect($outcome->rateLimited)->toBeTrue()
+        ->and($outcome->booked)->toBeFalse()
+        ->and($outcome->mayRetry())->toBeTrue()
+        ->and($outcome->retryAfter)->toBe($seconds)
+        ->and(HubDocument::query()->sole()->status)->toBe(HubDocument::STATUS_UNAVAILABLE);
+})->with([
+    'with Retry-After' => [['Retry-After' => '12'], 12],
+    'without Retry-After' => [[], 60],
+]);
+
+function fiveInvoices(): array
+{
+    $map = [];
+    $requested = [];
+
+    foreach (['inv-1', 'inv-2', 'inv-3', 'inv-4', 'inv-5'] as $id) {
+        $map["invoice:{$id}"] = sendable(['external_id' => $id]);
+        $requested[] = ['module' => 'invoice', 'id' => $id];
+    }
+
+    return [$map, $requested];
+}
+
+it('stops a batch at the first rate limit and sends nothing after it', function (): void {
+    Event::fake([DocumentBooked::class, DocumentBookingFailed::class]);
+
+    $mock = new MockClient([
+        HubMock::createDocument(),
+        HubMock::createDocument(),
+        rateLimited(['Retry-After' => '42']),
+    ]);
+    app(HubConnector::class)->withMockClient($mock);
+
+    [$map, $requested] = fiveInvoices();
+
+    $results = runner($map)->book($requested);
+
+    $mock->assertSentCount(3);
+
+    Event::assertDispatchedTimes(DocumentBooked::class, 2);
+    Event::assertDispatchedTimes(DocumentBookingFailed::class, 3);
+    Event::assertDispatched(DocumentBookingFailed::class, fn (DocumentBookingFailed $event): bool => $event->id === 'inv-5' && $event->outcome->rateLimited);
+
+    expect($results)->toHaveCount(5)
+        ->and($results[0]->outcome->booked)->toBeTrue()
+        ->and($results[1]->outcome->booked)->toBeTrue()
+        ->and($results[0]->outcome->retryAfter)->toBeNull()
+        ->and($results[1]->outcome->retryAfter)->toBeNull()
+        ->and($results[1]->outcome->rateLimited)->toBeFalse();
+
+    foreach ([2, 3, 4] as $index) {
+        expect($results[$index]->id)->toBe($requested[$index]['id'])
+            ->and($results[$index]->outcome->rateLimited)->toBeTrue()
+            ->and($results[$index]->outcome->booked)->toBeFalse()
+            ->and($results[$index]->outcome->mayRetry())->toBeTrue()
+            ->and($results[$index]->outcome->retryAfter)->toBe(42);
+    }
+
+    expect(HubDocument::query()->pluck('status', 'external_id')->all())->toBe([
+        'inv-1' => HubDocument::STATUS_POSTED,
+        'inv-2' => HubDocument::STATUS_POSTED,
+        'inv-3' => HubDocument::STATUS_UNAVAILABLE,
+    ]);
+});
+
+it('keeps going after an outage, since only a rate limit holds for the rest of the batch', function (): void {
+    $mock = new MockClient([
+        HubMock::createDocument(),
+        HubMock::createDocument(),
+        MockResponse::make(['error' => 'upstream_unavailable', 'message' => 'Upstream is down.', 'category' => 'SERVER_ERROR'], 503),
+        HubMock::createDocument(),
+        HubMock::createDocument(),
+    ]);
+    app(HubConnector::class)->withMockClient($mock);
+
+    [$map, $requested] = fiveInvoices();
+
+    $results = runner($map)->book($requested);
+
+    $mock->assertSentCount(5);
+
+    expect($results[2]->outcome->status)->toBe(503)
+        ->and($results[2]->outcome->rateLimited)->toBeFalse()
+        ->and($results[4]->outcome->booked)->toBeTrue();
+});
+
+it('retries a rate-limited document under the key it was first sent with', function (): void {
+    $first = new MockClient([CreateDocumentRequest::class => rateLimited(['Retry-After' => '5'])]);
+    app(HubConnector::class)->withMockClient($first);
+
+    $runner = runner(['invoice:inv-3' => sendable(['external_id' => 'inv-3'])]);
+
+    expect($runner->bookOne('invoice', 'inv-3')->rateLimited)->toBeTrue();
+
+    $second = new MockClient([CreateDocumentRequest::class => HubMock::createDocument()]);
+    app(HubConnector::class)->withMockClient($second);
+
+    expect($runner->bookOne('invoice', 'inv-3')->booked)->toBeTrue()
+        ->and($first->getLastRequest()->headers()->get('Idempotency-Key'))->toBe('inv-3')
+        ->and($second->getLastRequest()->headers()->get('Idempotency-Key'))->toBe('inv-3');
 });
 
 it('refuses to check a document that can never be sent', function (): void {

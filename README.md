@@ -311,6 +311,14 @@ A batch stops once `hub.booking.batch_seconds` is spent and returns fewer
 results than asked. Repeat with the remainder — safe, because an already-posted
 document is never sent twice.
 
+A batch also stops at the first `429`. Every document from that one on comes
+back with `$outcome->rateLimited` true, status `503` and `retryAfter` (Hub's
+`Retry-After`, or 60 seconds without one). The documents after it are not
+checked and not sent; each still fires `DocumentBookingFailed` with that
+`rateLimited` outcome, so you get one event per requested document. Retry them
+all after the wait: each document is sent under the same
+`Idempotency-Key` again, so a retry never books one twice.
+
 Routes, request validation and your response envelope stay yours; the SDK ships
 `Booking\Resources\*` and `Backlog\Resources\*` for the payload shapes.
 

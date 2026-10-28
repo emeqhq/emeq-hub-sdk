@@ -18,6 +18,7 @@ return [
     'not_allowed' => 'You may not edit this document, so you may not book it either.',
     'temporarily_unavailable' => 'The bookkeeping is briefly unreachable. Nothing was booked; try again shortly.',
     'already_in_progress' => 'A booking of this document is already running. Wait for it to finish.',
+    'rate_limited' => 'The bookkeeping is taking no more bookings for now. Nothing was booked; try again later.',
 
     'error' => [
         // Last resort for a row without a message — a row this package did not
