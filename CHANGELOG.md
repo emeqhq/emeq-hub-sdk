@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.34.0] — 2026-10-29
+
+### Added
+
+- **`Hub::accounting()->deleteDocument($externalId, $type, $accountId)`** wraps
+  `DELETE /v1/accounting/documents/{external_id}?type=...`. It returns nothing
+  on `204`, also when the package had already removed the booking. The
+  `external_id` is URL-encoded, so a `/` in an invoice number is safe. A
+  repeat delete, an unknown document or one of another Consumer gives
+  `NotFoundException` (`document_not_found`). The PAT needs `accounting:write`.
+  - `422 validation_error` and `422 unsupported_capability` give `ValidationException`.
+  - `429 upstream_rate_limited` gives `RateLimitException`.
+  - `503` gives `ServerException`.
+- **`DocumentDeleteRejected`** for `409 document_delete_rejected`: the package
+  refused and the booking is still there. `$upstreamError` and
+  `$upstreamStatus` carry the package's message and HTTP status. Do not retry
+  it; show the message to the user.
+
 ## [0.33.1] — 2026-10-28
 
 ### Added

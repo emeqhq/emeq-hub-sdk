@@ -3,12 +3,14 @@
 declare(strict_types=1);
 
 use Emeq\HubSdk\Exceptions\AuthenticationException;
+use Emeq\HubSdk\Exceptions\DocumentDeleteRejected;
 use Emeq\HubSdk\Exceptions\HubException;
 use Emeq\HubSdk\Exceptions\MissingConfigurationException;
 use Emeq\HubSdk\Exceptions\NotFoundException;
 use Emeq\HubSdk\Exceptions\RateLimitException;
 use Emeq\HubSdk\Exceptions\ValidationException;
 use Emeq\HubSdk\Http\HubConnector;
+use Emeq\HubSdk\Http\Request\Accounting\DeleteDocumentRequest;
 use Emeq\HubSdk\Http\Request\Accounting\GetAccountingRequest;
 use Emeq\HubSdk\Http\Request\ConnectSessions\CreateConnectSessionRequest;
 use Emeq\HubSdk\Http\Request\Integrations\ListIntegrationsRequest;
@@ -16,6 +18,7 @@ use Emeq\HubSdk\Http\Request\OAuth\InitOAuthRequest;
 use Emeq\HubSdk\Hub;
 use Emeq\HubSdk\Support\SdkIdentity;
 use Emeq\HubSdk\Testing\HubMock;
+use Saloon\Enums\Method;
 use Saloon\Http\Faking\MockClient;
 use Saloon\Http\Faking\MockResponse;
 
@@ -386,4 +389,98 @@ it('leaves categories, mode and actor out of a connect session when not given', 
     $mock->assertSent(fn (CreateConnectSessionRequest $request): bool => $request->body()->all() === [
         'account_external_id' => 'tenant-1',
     ]);
+});
+
+it('deletes a booked document by type and external id', function (): void {
+    $mock = new MockClient([
+        DeleteDocumentRequest::class => MockResponse::make('', 204),
+    ]);
+
+    app(HubConnector::class)->withMockClient($mock);
+
+    app(Hub::class)->accounting()->deleteDocument('INV-2026-001', 'sales_invoice', 'tenant-1');
+
+    $mock->assertSent(function (DeleteDocumentRequest $request): bool {
+        return $request->getMethod() === Method::DELETE
+            && $request->resolveEndpoint() === '/accounting/documents/INV-2026-001'
+            && $request->query()->all() === ['type' => 'sales_invoice']
+            && $request->headers()->get('X-Account-Id') === 'tenant-1';
+    });
+});
+
+it('encodes a slash in the external id', function (): void {
+    $mock = new MockClient([
+        DeleteDocumentRequest::class => MockResponse::make('', 204),
+    ]);
+
+    app(HubConnector::class)->withMockClient($mock);
+
+    app(Hub::class)->accounting()->deleteDocument('INV/2026/001', 'credit_note', 'tenant-1');
+
+    $mock->assertSent(function (DeleteDocumentRequest $request): bool {
+        return $request->resolveEndpoint() === '/accounting/documents/INV%2F2026%2F001';
+    });
+});
+
+it('throws not found for an unknown or already deleted document', function (): void {
+    $mock = new MockClient([
+        DeleteDocumentRequest::class => MockResponse::make([
+            'error' => 'document_not_found',
+            'message' => 'Document not found.',
+        ], 404),
+    ]);
+
+    app(HubConnector::class)->withMockClient($mock);
+
+    try {
+        app(Hub::class)->accounting()->deleteDocument('INV-2026-001', 'sales_invoice', 'tenant-1');
+        test()->fail('Expected NotFoundException');
+    } catch (NotFoundException $e) {
+        expect($e->error)->toBe('document_not_found')
+            ->and($e->status)->toBe(404);
+    }
+});
+
+it('exposes the upstream reason when the package rejects the delete', function (): void {
+    $mock = new MockClient([
+        DeleteDocumentRequest::class => MockResponse::make([
+            'external_id' => 'INV-2026-001',
+            'error' => 'document_delete_rejected',
+            'message' => 'Het boekhoudpakket weigerde de boeking te verwijderen. De boeking staat er nog.',
+            'upstream_error' => 'Entry is reconciled.',
+            'upstream_status' => 400,
+        ], 409),
+    ]);
+
+    app(HubConnector::class)->withMockClient($mock);
+
+    try {
+        app(Hub::class)->accounting()->deleteDocument('INV-2026-001', 'sales_invoice', 'tenant-1');
+        test()->fail('Expected DocumentDeleteRejected');
+    } catch (DocumentDeleteRejected $e) {
+        expect($e->error)->toBe('document_delete_rejected')
+            ->and($e->status)->toBe(409)
+            ->and($e->upstreamError)->toBe('Entry is reconciled.')
+            ->and($e->upstreamStatus)->toBe(400);
+    }
+});
+
+it('leaves the upstream fields empty when hub omits or mistypes them', function (): void {
+    $mock = new MockClient([
+        DeleteDocumentRequest::class => MockResponse::make([
+            'error' => 'document_delete_rejected',
+            'message' => 'Het boekhoudpakket weigerde de boeking te verwijderen. De boeking staat er nog.',
+            'upstream_status' => '400',
+        ], 409),
+    ]);
+
+    app(HubConnector::class)->withMockClient($mock);
+
+    try {
+        app(Hub::class)->accounting()->deleteDocument('INV-2026-001', 'sales_invoice', 'tenant-1');
+        test()->fail('Expected DocumentDeleteRejected');
+    } catch (DocumentDeleteRejected $e) {
+        expect($e->upstreamError)->toBeNull()
+            ->and($e->upstreamStatus)->toBeNull();
+    }
 });

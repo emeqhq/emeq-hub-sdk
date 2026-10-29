@@ -83,6 +83,11 @@ class HubException extends Exception
             $status === 403, $category === 'AUTHORIZATION_ERROR' => new AuthorizationException($message, $error, $category, $requestId, $status, $previous, $retryAfter, $retryable, $errors),
             $status === 404 => new NotFoundException($message, $error, $category, $requestId, $status, $previous, $retryAfter, $retryable, $errors),
             $status === 409 && $error === 'purchase_in_flight' => new PurchaseInFlight($message, $error, $category, $requestId, $status, $previous, $retryAfter, $retryable, $errors),
+            $status === 409 && $error === 'document_delete_rejected' => new DocumentDeleteRejected(
+                $message, $error, $category, $requestId, $status, $previous, $retryAfter, $retryable, $errors,
+                upstreamError: self::text($body['upstream_error'] ?? null),
+                upstreamStatus: is_int($body['upstream_status'] ?? null) ? $body['upstream_status'] : null,
+            ),
             $status === 422, $category === 'VALIDATION_ERROR' => new ValidationException($message, $error, $category, $requestId, $status, $previous, $retryAfter, $retryable, $errors),
             $status === 429 => new RateLimitException($message, $error, $category, $requestId, $status, $previous, $retryAfter, $retryable, $errors),
             $status >= 500 => new ServerException($message, $error, $category, $requestId, $status, $previous, $retryAfter, $retryable, $errors),

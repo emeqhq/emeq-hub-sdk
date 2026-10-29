@@ -508,6 +508,7 @@ suite. `Http\*` is package-internal (BFF / Saloon).
 | `Hub::connections()->delete($id)` | `DELETE /v1/connections/{id}` |
 | `Hub::accounting()->validateDocument(...)` | `POST /v1/accounting/documents/validate` |
 | `Hub::accounting()->createDocument(..., $idempotencyKey)` | `POST /v1/accounting/documents` |
+| `Hub::accounting()->deleteDocument($externalId, $type)` | `DELETE /v1/accounting/documents/{external_id}` (`accounting:write`) |
 | `Hub::accounting()->documents(...)` | `GET /v1/accounting/documents` |
 | `Hub::accounting()->bankStatements(...)` | `GET /v1/accounting/bank-statements` |
 | `Hub::accounting()->ledgerAccounts(...)` | `GET /v1/accounting/ledger-accounts` |
@@ -678,6 +679,7 @@ Envelope fields map to public properties: `error`, `category`, `requestId`, `sta
 | 422 / `VALIDATION_ERROR` | `ValidationException` |
 | 429 | `RateLimitException` |
 | 409 `purchase_in_flight` | `PurchaseInFlight` |
+| 409 `document_delete_rejected` | `DocumentDeleteRejected` (`upstreamError`, `upstreamStatus`) |
 | ≥ 500 | `ServerException` |
 | Missing `EMEQ_HUB_*`, unresolvable account id, bad `return_path`, non-lockable cache store | `MissingConfigurationException` (503) |
 

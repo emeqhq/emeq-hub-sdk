@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Emeq\HubSdk\Resources;
 
 use Emeq\HubSdk\Http\Request\Accounting\CreateDocumentRequest;
+use Emeq\HubSdk\Http\Request\Accounting\DeleteDocumentRequest;
 use Emeq\HubSdk\Http\Request\Accounting\GetAccountingRequest;
 use Emeq\HubSdk\Http\Request\Accounting\PutMappingRequest;
 use Emeq\HubSdk\Http\Request\Accounting\SyncAccountingRequest;
@@ -25,6 +26,15 @@ class Accounting extends Resource
         ));
 
         return $this->json($response->json());
+    }
+
+    public function deleteDocument(string $externalId, string $type, ?string $accountId = null): void
+    {
+        $this->connector->send(new DeleteDocumentRequest(
+            externalId: $externalId,
+            type: $type,
+            accountId: $this->resolveAccountId($accountId),
+        ));
     }
 
     /**
